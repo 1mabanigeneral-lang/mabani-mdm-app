@@ -1,8 +1,11 @@
 package com.mabani.mdm
 
 import android.app.admin.DeviceAdminReceiver
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 
 /**
  * Device Admin / Device Owner receiver. Android calls onEnabled() right
@@ -20,7 +23,42 @@ class AdminReceiver : DeviceAdminReceiver() {
         if (!token.isNullOrBlank()) {
             Prefs.saveEnrollToken(context, token)
         }
+
+        // During silent zero-touch provisioning there's no one around to tap
+        // through a runtime-permission dialog, so as Device Owner we grant
+        // the permissions ourselves. Without this, the foreground service we
+        // start below (declared with a "location" type) throws a
+        // SecurityException on Android 14+ because that permission isn't
+        // granted yet -- crashing the app right after install, which is what
+        // makes the system provisioning wizard show "Something went wrong".
+        grantRuntimePermissions(context)
+
         HeartbeatService.start(context)
+    }
+
+    private fun grantRuntimePermissions(context: Context) {
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val admin = ComponentName(context, AdminReceiver::class.java)
+        if (!dpm.isDeviceOwnerApp(context.packageName)) return
+
+        val permissions = mutableListOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        for (permission in permissions) {
+            try {
+                dpm.setPermissionGrantState(
+                    admin, context.packageName, permission,
+                    DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+                )
+            } catch (_: Exception) {
+                // Best-effort -- HeartbeatService also degrades gracefully
+                // if a permission still isn't granted for some reason.
+            }
+        }
     }
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {

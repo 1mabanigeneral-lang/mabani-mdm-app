@@ -52,8 +52,31 @@ class HeartbeatService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannelIfNeeded()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForegroundSafely()
         startLocationUpdatesIfPermitted()
+    }
+
+    // On Android 10+ we can tell startForeground() exactly which
+    // service type(s) to claim. A "location" type foreground service
+    // requires the location permission to already be granted or the
+    // system throws a SecurityException -- so only claim it when we
+    // actually have the permission; otherwise fall back to dataSync
+    // only. This keeps the service (and the app) from crashing if it
+    // is ever started before permissions are granted.
+    private fun startForegroundSafely() {
+        val notification = buildNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val hasLocation =
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            var type = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            if (hasLocation) {
+                type = type or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
+            startForeground(NOTIFICATION_ID, notification, type)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
