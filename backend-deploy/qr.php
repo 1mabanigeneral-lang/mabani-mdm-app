@@ -76,7 +76,7 @@ body{background:#f4f1ea;min-height:100vh;}
     <?php else: ?>
       <div id="qrBox"></div>
       <script>
-        QRCode.toCanvas(document.createElement('canvas'), <?= $provisioningJson ?>, {width: 300}, function (err, canvas) {
+        QRCode.toCanvas(document.createElement('canvas'), <?= json_encode($provisioningJson) ?>, {width: 300}, function (err, canvas) {
           if (err) { document.getElementById('qrBox').innerText = 'خطأ بتوليد QR: ' + err; return; }
           document.getElementById('qrBox').appendChild(canvas);
         });
