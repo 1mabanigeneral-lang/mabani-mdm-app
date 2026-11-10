@@ -10,8 +10,9 @@ import javax.net.ssl.HttpsURLConnection
 
 /**
  * Minimal JSON/HTTP client for talking to the MDM backend
- * (mdm.1mabanihr.com/api/*.php). No external libraries — just
- * HttpURLConnection, to keep the build small and dependency-free.
+ * (mdm.1mabanihr.com, the api folder's PHP endpoints). No external
+ * libraries — just HttpURLConnection, to keep the build small and
+ * dependency-free.
  */
 object ApiClient {
     private const val TAG = "MdmApi"
