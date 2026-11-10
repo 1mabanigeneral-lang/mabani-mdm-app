@@ -37,7 +37,7 @@ if ($meta && !empty($meta['checksum']) && !empty($device['enroll_token'])) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QR التسجيل — <?= htmlspecialchars($device['device_name']) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',system-ui,sans-serif}
 body{background:#f4f1ea;min-height:100vh;}
