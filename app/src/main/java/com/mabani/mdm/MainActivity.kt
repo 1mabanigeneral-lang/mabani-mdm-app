@@ -22,20 +22,27 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // If this activity was launched by the system right after
+        // zero-touch/QR provisioning finished, the system expects this
+        // activity to report success and finish() immediately -- it does
+        // NOT want permission dialogs, a layout, or any other UI shown at
+        // this point. Returning straight away (before setContentView and
+        // before touching any views) avoids the provisioning wizard
+        // hanging/failing with "Something went wrong".
+        if (intent?.action == "android.app.action.ADMIN_POLICY_COMPLIANCE") {
+            HeartbeatService.start(this)
+            setResult(RESULT_OK)
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
 
         statusText = findViewById(R.id.statusText)
         tokenInput = findViewById(R.id.tokenInput)
         val enrollButton = findViewById<Button>(R.id.enrollButton)
         val requestAdminButton = findViewById<Button>(R.id.requestAdminButton)
-
-        // If this activity was launched by the system right after
-        // zero-touch/QR provisioning finished, just make sure the service
-        // is running and get out of the way.
-        if (intent?.action == "android.app.action.ADMIN_POLICY_COMPLIANCE") {
-            HeartbeatService.start(this)
-            setResult(RESULT_OK)
-        }
 
         Prefs.enrollToken(this)?.let { tokenInput.setText(it) }
 
