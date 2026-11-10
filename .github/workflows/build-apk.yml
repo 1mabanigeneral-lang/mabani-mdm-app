@@ -1,0 +1,74 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set versionCode/versionName from run number
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode $(( ${{ github.run_number }} + 1 ))/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"1.$(( ${{ github.run_number }} + 1 ))\"/" app/build.gradle
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      # A debug build is signed with a throw-away key that's different on
+      # every GitHub runner, so phones refuse to UPDATE an installed copy.
+      # Re-sign with our permanent keystore so every build can replace the
+      # previous one, and so the APK checksum used in the QR-provisioning
+      # code stays stable build to build.
+      - name: Re-sign APK with the permanent keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "::error::No KEYSTORE_BASE64 secret set — run the generate-keystore workflow first and add the secrets."; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          APKSIGNER=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/keystore.jks" --ks-key-alias mabanimdm \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out app-signed.apk \
+            app/build/outputs/apk/debug/app-debug.apk
+          "$APKSIGNER" verify --print-certs app-signed.apk | head -3
+
+      # Compute the APK's SHA-256 checksum, base64url-encoded with no padding —
+      # the exact format Android's QR/zero-touch provisioning expects for
+      # PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM.
+      - name: Compute checksum and write app-meta.json
+        run: |
+          CHECKSUM=$(sha256sum app-signed.apk | cut -d' ' -f1 | xxd -r -p | base64 | tr '+/' '-_' | tr -d '=')
+          VERSION_CODE=$(( ${{ github.run_number }} + 1 ))
+          cat > app-meta.json << EOF
+          {
+            "package_name": "com.mabani.mdm",
+            "admin_receiver": "com.mabani.mdm/com.mabani.mdm.AdminReceiver",
+            "checksum": "$CHECKSUM",
+            "version_code": $VERSION_CODE,
+            "download_url": "https://mdm.1mabanihr.com/download/app.apk"
+          }
+          EOF
+          cat app-meta.json
+
+      - name: Upload APK + metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdm-app-release
+          path: |
+            app-signed.apk
+            app-meta.json

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#F4F1EA">
+
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1MABANI MDM"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#1A0A10"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="جاري التحقق من حالة الجهاز..."
+        android:textSize="13sp"
+        android:textColor="#8A7F6E"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <EditText
+        android:id="@+id/tokenInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="كود التسجيل (Enroll Token)"
+        android:inputType="text"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/enrollButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="تسجيل الجهاز"
+        android:backgroundTint="#3D0F1C"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/requestAdminButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="تفعيل صلاحيات المسؤول (مرة واحدة)"
+        android:backgroundTint="#B8860B"
+        android:textColor="#FFFFFF" />
+
+</LinearLayout>
