@@ -46,6 +46,14 @@ class MainActivity : AppCompatActivity() {
 
         Prefs.enrollToken(this)?.let { tokenInput.setText(it) }
 
+        // Safety net: if the heartbeat service ever died (e.g. after an
+        // app update, before the PACKAGE_REPLACED fix, or for any other
+        // reason) and nothing restarted it, simply opening the app brings
+        // it back without needing a full device reboot.
+        if (Prefs.isEnrolled(this) || Prefs.enrollToken(this) != null) {
+            HeartbeatService.start(this)
+        }
+
         requestPermissionsIfNeeded()
         refreshStatus()
 
