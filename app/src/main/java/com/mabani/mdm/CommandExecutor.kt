@@ -75,20 +75,52 @@ object CommandExecutor {
                     }
                 }
                 "LOCK_KIOSK" -> {
-                    val pkg = payload?.optString("package")
-                    if (pkg.isNullOrBlank()) {
-                        Log.w(TAG, "LOCK_KIOSK with no package in payload")
+                    // Accept either {"packages": ["a","b",...]} (preferred,
+                    // one or more apps) or the older {"package": "a"} shape.
+                    val pkgs = mutableListOf<String>()
+                    val pkgsArray = payload?.optJSONArray("packages")
+                    if (pkgsArray != null) {
+                        for (i in 0 until pkgsArray.length()) {
+                            val p = pkgsArray.optString(i)
+                            if (p.isNotBlank()) pkgs.add(p)
+                        }
+                    }
+                    if (pkgs.isEmpty()) {
+                        val single = payload?.optString("package")
+                        if (!single.isNullOrBlank()) pkgs.add(single)
+                    }
+
+                    if (pkgs.isEmpty()) {
+                        Log.w(TAG, "LOCK_KIOSK with no packages in payload")
                         Outcome.FAILED
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        // Whitelist only this app (plus our own, so the MDM
+                        // Whitelist the chosen apps (plus our own, so the MDM
                         // service keeps running and we can still reach the
-                        // device) and launch it pinned -- no changes needed
-                        // in the target app itself, since Device Owner can
-                        // force lock-task mode via ActivityOptions.
-                        dpm.setLockTaskPackages(admin, arrayOf(pkg, ctx.packageName))
-                        val launchIntent = ctx.packageManager.getLaunchIntentForPackage(pkg)
+                        // device) and launch the first one pinned -- no
+                        // changes needed in the target apps themselves, since
+                        // Device Owner can force lock-task mode via
+                        // ActivityOptions.
+                        val allowed = (pkgs + ctx.packageName).distinct().toTypedArray()
+                        dpm.setLockTaskPackages(admin, allowed)
+                        try {
+                            // HOME lets the user switch between the allowed
+                            // apps via a restricted launcher instead of being
+                            // stuck on just the first one; OVERVIEW/NOTIFICATIONS
+                            // keep recents and the notification shade usable
+                            // for the same reason. Nothing outside the
+                            // whitelisted apps is reachable from any of these.
+                            dpm.setLockTaskFeatures(
+                                admin,
+                                DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                                    DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
+                                    DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
+                            )
+                        } catch (e: Exception) {
+                            Log.w(TAG, "setLockTaskFeatures failed: ${e.message}")
+                        }
+                        val launchIntent = ctx.packageManager.getLaunchIntentForPackage(pkgs[0])
                         if (launchIntent == null) {
-                            Log.w(TAG, "No launch intent for $pkg (not installed?)")
+                            Log.w(TAG, "No launch intent for ${pkgs[0]} (not installed?)")
                             Outcome.FAILED
                         } else {
                             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)

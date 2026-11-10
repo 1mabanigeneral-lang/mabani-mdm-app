@@ -14,12 +14,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $cmd = $_POST['command'] ?? '';
     $allowed = ['LOCK', 'UNLOCK', 'PING', 'WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'LOCK_KIOSK', 'UNLOCK_KIOSK'];
     $pkg = trim($_POST['package'] ?? '');
-    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'LOCK_KIOSK'], true);
-    if (in_array($cmd, $allowed, true) && (!$needsPkg || $pkg !== '')) {
-        $payload = $needsPkg ? json_encode(['package' => $pkg]) : null;
+    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP'], true);
+    $isKioskLock = $cmd === 'LOCK_KIOSK';
+
+    // LOCK_KIOSK's "package" field is a comma-separated list of one or more
+    // package names (built client-side from the checked apps + any custom
+    // ones typed in), unlike the other commands which take exactly one.
+    $kioskPkgs = [];
+    if ($isKioskLock) {
+        foreach (explode(',', $pkg) as $p) {
+            $p = trim($p);
+            if ($p !== '') $kioskPkgs[] = $p;
+        }
+    }
+
+    $valid = in_array($cmd, $allowed, true)
+        && (!$needsPkg || $pkg !== '')
+        && (!$isKioskLock || count($kioskPkgs) > 0);
+
+    if ($valid) {
+        if ($isKioskLock) {
+            $payload = json_encode(['packages' => $kioskPkgs]);
+        } elseif ($needsPkg) {
+            $payload = json_encode(['package' => $pkg]);
+        } else {
+            $payload = null;
+        }
         $st2 = $pdo->prepare("INSERT INTO device_commands (device_id, command, payload, status) VALUES (?, ?, ?, 'pending')");
         $st2->execute([$id, $cmd, $payload]);
-        $sent = $cmd . ($needsPkg ? " ($pkg)" : '');
+        $sent = $cmd;
+        if ($isKioskLock) $sent .= ' (' . implode(', ', $kioskPkgs) . ')';
+        elseif ($needsPkg) $sent .= " ($pkg)";
     }
 }
 
@@ -139,19 +164,21 @@ body{background:#f4f1ea;min-height:100vh;}
     </form>
   </div>
   <div class="card">
-    <div class="secTitle">وضع Kiosk (قفل الجهاز بالكامل على تطبيق واحد فقط)</div>
+    <div class="secTitle">وضع Kiosk (قفل الجهاز بالكامل على التطبيقات المختارة بس)</div>
     <p style="font-size:11.5px;color:#8a7f6e;margin-bottom:10px;line-height:1.7;">
-      لما تفعّله، الجهاز بيصير مقفول على التطبيق المحدد فقط — المستخدم ما بيقدر يطلع منه، ما بيوصل لأي تطبيق تاني ولا للإعدادات، لين ترسل أمر "إلغاء" من هون.
+      اختر تطبيق واحد أو أكثر (متلا 4). لما تفعّله، الجهاز بيصير مقفول — المستخدم بيقدر يفتح بس هاي التطبيقات (ويتنقل بينها بزر الهوم)، وما بيوصل لأي شي تاني ولا للإعدادات، لين ترسل أمر "إلغاء" من هون.
     </p>
     <form method="post" onsubmit="return confirmKiosk(this);">
       <input type="hidden" name="action" value="send_command">
-      <select id="kioskSelect" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:8px;" onchange="document.getElementById('kioskCustom').value=this.value==='__other__'?'':this.value;">
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
         <?php foreach ($commonApps as $pkgId => $label): ?>
-          <option value="<?= htmlspecialchars($pkgId) ?>"><?= htmlspecialchars($label) ?> (<?= htmlspecialchars($pkgId) ?>)</option>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#1a0a10;">
+            <input type="checkbox" class="kioskCheck" value="<?= htmlspecialchars($pkgId) ?>">
+            <?= htmlspecialchars($label) ?> (<?= htmlspecialchars($pkgId) ?>)
+          </label>
         <?php endforeach; ?>
-        <option value="__other__" selected>تطبيق آخر (اكتب اسم الحزمة يدويًا)...</option>
-      </select>
-      <input type="text" id="kioskCustom" placeholder="اسم حزمة تطبيق الفورمان مثلاً، أو أي تطبيق تاني" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:10px;">
+      </div>
+      <input type="text" id="kioskCustom" placeholder="تطبيقات إضافية، مفصولة بفاصلة — مثلاً: com.mabani.foreman, com.android.chrome" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:10px;">
       <div class="btnGrid">
         <button class="cmdBtn" type="submit" name="command" value="LOCK_KIOSK" onclick="syncKioskPkg()">🔒 تفعيل القفل الكامل</button>
         <button class="cmdBtn danger" type="submit" name="command" value="UNLOCK_KIOSK" onclick="syncKioskPkg()">🔓 إلغاء القفل الكامل</button>
@@ -161,18 +188,17 @@ body{background:#f4f1ea;min-height:100vh;}
   </div>
   <script>
     function syncKioskPkg(){
-      var sel = document.getElementById('kioskSelect');
-      var custom = document.getElementById('kioskCustom').value.trim();
-      var val = custom !== '' ? custom : (sel.value !== '__other__' ? sel.value : '');
-      document.getElementById('kioskPkgHidden').value = val;
+      var checked = Array.prototype.slice.call(document.querySelectorAll('.kioskCheck:checked')).map(function(el){ return el.value; });
+      var custom = document.getElementById('kioskCustom').value.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s !== ''; });
+      document.getElementById('kioskPkgHidden').value = checked.concat(custom).join(',');
     }
     function confirmKiosk(form){
       syncKioskPkg();
       var cmd = document.activeElement ? document.activeElement.value : '';
       if (cmd === 'LOCK_KIOSK') {
-        var pkg = document.getElementById('kioskPkgHidden').value;
-        if (!pkg) { alert('اكتب اسم حزمة التطبيق أولاً'); return false; }
-        return confirm('متأكد؟ الجهاز رح يصير مقفول بالكامل على "' + pkg + '" لين ترسل أمر إلغاء.');
+        var pkgs = document.getElementById('kioskPkgHidden').value;
+        if (!pkgs) { alert('اختر تطبيق واحد على الأقل أولاً'); return false; }
+        return confirm('متأكد؟ الجهاز رح يصير مقفول بالكامل على: ' + pkgs.split(',').join('، ') + ' — لين ترسل أمر إلغاء.');
       }
       return true;
     }
@@ -198,6 +224,7 @@ body{background:#f4f1ea;min-height:100vh;}
       if (!empty($c['payload'])) {
           $p = json_decode($c['payload'], true);
           if (!empty($p['package'])) $pkgSuffix = ' — ' . $p['package'];
+          elseif (!empty($p['packages']) && is_array($p['packages'])) $pkgSuffix = ' — ' . implode(', ', $p['packages']);
       }
     ?>
       <div class="hRow">
