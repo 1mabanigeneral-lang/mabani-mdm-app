@@ -12,9 +12,9 @@ if (!$device) { header('Location: devices.php'); exit(); }
 $sent = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_command') {
     $cmd = $_POST['command'] ?? '';
-    $allowed = ['LOCK', 'UNLOCK', 'PING', 'WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP'];
+    $allowed = ['LOCK', 'UNLOCK', 'PING', 'WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'LOCK_KIOSK', 'UNLOCK_KIOSK'];
     $pkg = trim($_POST['package'] ?? '');
-    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP'], true);
+    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'LOCK_KIOSK'], true);
     if (in_array($cmd, $allowed, true) && (!$needsPkg || $pkg !== '')) {
         $payload = $needsPkg ? json_encode(['package' => $pkg]) : null;
         $st2 = $pdo->prepare("INSERT INTO device_commands (device_id, command, payload, status) VALUES (?, ?, ?, 'pending')");
@@ -37,6 +37,8 @@ $cmdLabels = [
     'WIPE_APP_DATA' => 'مسح بيانات تطبيق',
     'HIDE_APP' => 'إخفاء تطبيق',
     'SHOW_APP' => 'إظهار تطبيق',
+    'LOCK_KIOSK' => 'تفعيل وضع Kiosk',
+    'UNLOCK_KIOSK' => 'إلغاء وضع Kiosk',
 ];
 
 $commonApps = [
@@ -136,7 +138,44 @@ body{background:#f4f1ea;min-height:100vh;}
       <input type="hidden" name="package" id="pkgHidden" value="">
     </form>
   </div>
+  <div class="card">
+    <div class="secTitle">وضع Kiosk (قفل الجهاز بالكامل على تطبيق واحد فقط)</div>
+    <p style="font-size:11.5px;color:#8a7f6e;margin-bottom:10px;line-height:1.7;">
+      لما تفعّله، الجهاز بيصير مقفول على التطبيق المحدد فقط — المستخدم ما بيقدر يطلع منه، ما بيوصل لأي تطبيق تاني ولا للإعدادات، لين ترسل أمر "إلغاء" من هون.
+    </p>
+    <form method="post" onsubmit="return confirmKiosk(this);">
+      <input type="hidden" name="action" value="send_command">
+      <select id="kioskSelect" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:8px;" onchange="document.getElementById('kioskCustom').value=this.value==='__other__'?'':this.value;">
+        <?php foreach ($commonApps as $pkgId => $label): ?>
+          <option value="<?= htmlspecialchars($pkgId) ?>"><?= htmlspecialchars($label) ?> (<?= htmlspecialchars($pkgId) ?>)</option>
+        <?php endforeach; ?>
+        <option value="__other__" selected>تطبيق آخر (اكتب اسم الحزمة يدويًا)...</option>
+      </select>
+      <input type="text" id="kioskCustom" placeholder="اسم حزمة تطبيق الفورمان مثلاً، أو أي تطبيق تاني" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:10px;">
+      <div class="btnGrid">
+        <button class="cmdBtn" type="submit" name="command" value="LOCK_KIOSK" onclick="syncKioskPkg()">🔒 تفعيل القفل الكامل</button>
+        <button class="cmdBtn danger" type="submit" name="command" value="UNLOCK_KIOSK" onclick="syncKioskPkg()">🔓 إلغاء القفل الكامل</button>
+      </div>
+      <input type="hidden" name="package" id="kioskPkgHidden" value="">
+    </form>
+  </div>
   <script>
+    function syncKioskPkg(){
+      var sel = document.getElementById('kioskSelect');
+      var custom = document.getElementById('kioskCustom').value.trim();
+      var val = custom !== '' ? custom : (sel.value !== '__other__' ? sel.value : '');
+      document.getElementById('kioskPkgHidden').value = val;
+    }
+    function confirmKiosk(form){
+      syncKioskPkg();
+      var cmd = document.activeElement ? document.activeElement.value : '';
+      if (cmd === 'LOCK_KIOSK') {
+        var pkg = document.getElementById('kioskPkgHidden').value;
+        if (!pkg) { alert('اكتب اسم حزمة التطبيق أولاً'); return false; }
+        return confirm('متأكد؟ الجهاز رح يصير مقفول بالكامل على "' + pkg + '" لين ترسل أمر إلغاء.');
+      }
+      return true;
+    }
     function syncPkg(){
       var sel = document.getElementById('pkgSelect');
       var custom = document.getElementById('pkgCustom').value.trim();
