@@ -139,6 +139,15 @@ body{background:#f4f1ea;min-height:100vh;}
     <div class="infoRow"><span>آخر ظهور</span><span><?= $device['last_seen'] ? htmlspecialchars(date('Y-m-d h:i A', strtotime($device['last_seen']))) : '—' ?></span></div>
     <div class="infoRow"><span>آخر موقع</span><span><?= ($device['last_lat'] && $device['last_lng']) ? htmlspecialchars($device['last_lat'] . ', ' . $device['last_lng']) : '—' ?></span></div>
     <div class="infoRow"><span>البطارية</span><span><?= $device['battery_pct'] !== null ? $device['battery_pct'] . '%' : '—' ?></span></div>
+    <?php if ($device['last_lat'] && $device['last_lng']):
+        $lat = (float)$device['last_lat']; $lng = (float)$device['last_lng'];
+        $d = 0.003; // small bounding box around the point, for the embedded map
+        $bbox = ($lng - $d) . ',' . ($lat - $d) . ',' . ($lng + $d) . ',' . ($lat + $d);
+    ?>
+      <iframe style="width:100%;height:220px;border:0;border-radius:10px;margin-top:10px;" loading="lazy"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=<?= htmlspecialchars($bbox) ?>&marker=<?= $lat ?>,<?= $lng ?>"></iframe>
+      <a href="https://www.google.com/maps?q=<?= $lat ?>,<?= $lng ?>" target="_blank" style="display:block;text-align:center;font-size:11.5px;color:#B45309;margin-top:8px;text-decoration:none;">📍 فتح الموقع بخرائط قوقل</a>
+    <?php endif; ?>
   </div>
 
   <?php if ($sent): ?>
