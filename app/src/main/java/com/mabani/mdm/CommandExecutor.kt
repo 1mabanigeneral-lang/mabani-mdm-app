@@ -76,6 +76,26 @@ object CommandExecutor {
                         Outcome.ACKED
                     }
                 }
+                "OPEN_APP" -> {
+                    // Plain remote "open this app" -- no Lock Task, no
+                    // restriction on anything else. Just brings the chosen
+                    // app to the foreground, same as the user tapping its
+                    // icon themselves.
+                    val pkg = payload?.optString("package")
+                    if (pkg.isNullOrBlank()) {
+                        Outcome.FAILED
+                    } else {
+                        val launchIntent = ctx.packageManager.getLaunchIntentForPackage(pkg)
+                        if (launchIntent == null) {
+                            Log.w(TAG, "OPEN_APP: no launch intent for $pkg (not installed?)")
+                            Outcome.FAILED
+                        } else {
+                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            ctx.startActivity(launchIntent)
+                            Outcome.ACKED
+                        }
+                    }
+                }
                 "LOCK_KIOSK" -> {
                     // Accept either {"packages": ["a","b",...]} (preferred,
                     // one or more apps) or the older {"package": "a"} shape.

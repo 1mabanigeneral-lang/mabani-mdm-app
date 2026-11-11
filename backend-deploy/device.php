@@ -12,9 +12,9 @@ if (!$device) { header('Location: devices.php'); exit(); }
 $sent = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_command') {
     $cmd = $_POST['command'] ?? '';
-    $allowed = ['LOCK', 'UNLOCK', 'PING', 'WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'LOCK_KIOSK', 'UNLOCK_KIOSK'];
+    $allowed = ['LOCK', 'UNLOCK', 'PING', 'WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'OPEN_APP', 'LOCK_KIOSK', 'UNLOCK_KIOSK'];
     $pkg = trim($_POST['package'] ?? '');
-    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP'], true);
+    $needsPkg = in_array($cmd, ['WIPE_APP_DATA', 'HIDE_APP', 'SHOW_APP', 'OPEN_APP'], true);
     $isKioskLock = $cmd === 'LOCK_KIOSK';
 
     // LOCK_KIOSK's "package" field is a comma-separated list of one or more
@@ -62,11 +62,13 @@ $cmdLabels = [
     'WIPE_APP_DATA' => 'مسح بيانات تطبيق',
     'HIDE_APP' => 'إخفاء تطبيق',
     'SHOW_APP' => 'إظهار تطبيق',
+    'OPEN_APP' => 'فتح تطبيق عن بعد',
     'LOCK_KIOSK' => 'تفعيل وضع Kiosk',
     'UNLOCK_KIOSK' => 'إلغاء وضع Kiosk',
 ];
 
 $commonApps = [
+    'com.mabani.foreman' => 'تطبيق الفورمن',
     'com.whatsapp' => 'واتساب',
     'com.android.vending' => 'Google Play',
     'com.android.chrome' => 'Chrome',
@@ -154,7 +156,7 @@ body{background:#f4f1ea;min-height:100vh;}
   </div>
 
   <div class="card">
-    <div class="secTitle">إدارة التطبيقات (إخفاء / إظهار / مسح بيانات)</div>
+    <div class="secTitle">إدارة التطبيقات (فتح عن بعد / إخفاء / إظهار / مسح بيانات)</div>
     <form method="post" onsubmit="return confirmAppAction(this);">
       <input type="hidden" name="action" value="send_command">
       <select id="pkgSelect" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:8px;" onchange="document.getElementById('pkgCustom').value=this.value==='__other__'?'':this.value;">
@@ -165,6 +167,7 @@ body{background:#f4f1ea;min-height:100vh;}
       </select>
       <input type="text" id="pkgCustom" placeholder="أو اكتب اسم الحزمة مباشرة، مثل: com.whatsapp" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ece7db;font-size:12.5px;font-family:'Cairo',system-ui,sans-serif;margin-bottom:10px;">
       <div class="btnGrid">
+        <button class="cmdBtn" type="submit" name="command" value="OPEN_APP" onclick="syncPkg()" style="grid-column:span 2;border-color:#A7D7C5;">📲 فتح هذا التطبيق عن بعد الآن</button>
         <button class="cmdBtn" type="submit" name="command" value="HIDE_APP" onclick="syncPkg()">🙈 إخفاء</button>
         <button class="cmdBtn" type="submit" name="command" value="SHOW_APP" onclick="syncPkg()">👁 إظهار</button>
         <button class="cmdBtn danger" type="submit" name="command" value="WIPE_APP_DATA" onclick="syncPkg()" style="grid-column:span 2;">🗑 مسح بيانات هذا التطبيق</button>
