@@ -129,11 +129,30 @@ object CommandExecutor {
                         } catch (e: Exception) {
                             Log.w(TAG, "setLockTaskFeatures failed: ${e.message}")
                         }
-                        val launchIntent = ctx.packageManager.getLaunchIntentForPackage(pkgs[0])
+                        // Launch whichever requested app is actually installed,
+                        // trying them in the order they were picked (so Foreman
+                        // opens first when it's present). This keeps a Kiosk
+                        // command from failing outright just because one app
+                        // in the list (e.g. an app not yet installed on this
+                        // particular device) isn't there -- the whitelist is
+                        // still set in full above, so once that app IS
+                        // installed later, it's reachable from the restricted
+                        // home screen without resending the command.
+                        var launchIntent: Intent? = null
+                        var launchedPkg: String? = null
+                        for (candidate in pkgs) {
+                            val intent = ctx.packageManager.getLaunchIntentForPackage(candidate)
+                            if (intent != null) {
+                                launchIntent = intent
+                                launchedPkg = candidate
+                                break
+                            }
+                        }
                         if (launchIntent == null) {
-                            Log.w(TAG, "No launch intent for ${pkgs[0]} (not installed?)")
+                            Log.w(TAG, "No launch intent for any of $pkgs (none installed?)")
                             Outcome.FAILED
                         } else {
+                            Log.i(TAG, "LOCK_KIOSK launching $launchedPkg")
                             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             val options = ActivityOptions.makeBasic()
                             options.setLockTaskEnabled(true)
