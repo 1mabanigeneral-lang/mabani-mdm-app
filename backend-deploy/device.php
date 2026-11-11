@@ -3,6 +3,20 @@ require_once __DIR__ . '/../config.php';
 mdm_require_login();
 $pdo = mdm_getDB();
 
+// Timestamps are stored in UTC (the server's own clock); this converts
+// them to Dubai time for display, so "last seen" doesn't look stale/wrong
+// just because of the +4 hour gap from the server's clock.
+function mdm_to_dubai_time($utcDatetimeStr) {
+    if (!$utcDatetimeStr) return null;
+    try {
+        $dt = new DateTime($utcDatetimeStr, new DateTimeZone('UTC'));
+        $dt->setTimezone(new DateTimeZone('Asia/Dubai'));
+        return $dt->format('Y-m-d h:i A');
+    } catch (Exception $e) {
+        return $utcDatetimeStr;
+    }
+}
+
 $id = (int)($_GET['id'] ?? 0);
 $st = $pdo->prepare("SELECT * FROM devices WHERE id = ? LIMIT 1");
 $st->execute([$id]);
@@ -136,7 +150,7 @@ body{background:#f4f1ea;min-height:100vh;}
     <div class="infoRow"><span>الحالة</span><span><?= htmlspecialchars($device['status']) ?></span></div>
     <div class="infoRow"><span>الموديل</span><span><?= htmlspecialchars($device['model'] ?: '—') ?></span></div>
     <div class="infoRow"><span>إصدار أندرويد</span><span><?= htmlspecialchars($device['android_version'] ?: '—') ?></span></div>
-    <div class="infoRow"><span>آخر ظهور</span><span><?= $device['last_seen'] ? htmlspecialchars(date('Y-m-d h:i A', strtotime($device['last_seen']))) : '—' ?></span></div>
+    <div class="infoRow"><span>آخر ظهور</span><span><?= $device['last_seen'] ? htmlspecialchars(mdm_to_dubai_time($device['last_seen'])) . ' (بتوقيت دبي)' : '—' ?></span></div>
     <div class="infoRow"><span>آخر موقع</span><span><?= ($device['last_lat'] && $device['last_lng']) ? htmlspecialchars($device['last_lat'] . ', ' . $device['last_lng']) : '—' ?></span></div>
     <div class="infoRow"><span>البطارية</span><span><?= $device['battery_pct'] !== null ? $device['battery_pct'] . '%' : '—' ?></span></div>
     <?php if ($device['last_lat'] && $device['last_lng']):
@@ -251,7 +265,7 @@ body{background:#f4f1ea;min-height:100vh;}
       <div class="hRow">
         <div>
           <div class="hName"><?= htmlspecialchars(($cmdLabels[$c['command']] ?? $c['command']) . $pkgSuffix) ?></div>
-          <div class="hTime"><?= htmlspecialchars(date('Y-m-d h:i A', strtotime($c['created_at']))) ?></div>
+          <div class="hTime"><?= htmlspecialchars(mdm_to_dubai_time($c['created_at'])) ?></div>
         </div>
         <span class="badge" style="color:<?= $s[1] ?>;background:<?= $s[2] ?>;"><?= $s[0] ?></span>
       </div>
