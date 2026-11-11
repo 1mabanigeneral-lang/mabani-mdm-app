@@ -6,6 +6,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.util.Log
 import org.json.JSONObject
 
@@ -90,6 +92,15 @@ object CommandExecutor {
                         if (!single.isNullOrBlank()) pkgs.add(single)
                     }
 
+                    // Phone/SMS/Camera package names are OEM-specific (differ
+                    // between the G-Tab and Honor devices in the fleet), so
+                    // instead of hardcoding guesses we resolve whichever apps
+                    // are this device's own default dialer/SMS/camera at
+                    // runtime and always include them -- this way the same
+                    // backend command produces a correct whitelist on every
+                    // phone model without per-device configuration.
+                    pkgs.addAll(resolveBuiltInAppWhitelist(ctx))
+
                     if (pkgs.isEmpty()) {
                         Log.w(TAG, "LOCK_KIOSK with no packages in payload")
                         Outcome.FAILED
@@ -153,5 +164,42 @@ object CommandExecutor {
             Log.e(TAG, "Error executing $command: ${e.message}")
             Outcome.FAILED
         }
+    }
+
+    // Finds this specific device's default phone/dialer, default SMS, and
+    // default camera apps, so Kiosk mode always lets the user call, text,
+    // and take photos -- regardless of which OEM app provides those on this
+    // particular phone model. Each lookup is independently best-effort: if
+    // one fails or finds nothing, the others still proceed.
+    private fun resolveBuiltInAppWhitelist(ctx: Context): List<String> {
+        val found = mutableListOf<String>()
+
+        try {
+            val telecom = ctx.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            val dialerPkg = telecom?.defaultDialerPackage
+            if (!dialerPkg.isNullOrBlank()) found.add(dialerPkg)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not resolve default dialer: ${e.message}")
+        }
+
+        try {
+            val smsPkg = Telephony.Sms.getDefaultSmsPackage(ctx)
+            if (!smsPkg.isNullOrBlank()) found.add(smsPkg)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not resolve default SMS app: ${e.message}")
+        }
+
+        try {
+            // Every camera app registers this launcher category; resolving
+            // it returns whichever one the system treats as the default.
+            val cameraIntent = Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CAMERA")
+            val resolved = ctx.packageManager.resolveActivity(cameraIntent, 0)
+            val cameraPkg = resolved?.activityInfo?.packageName
+            if (!cameraPkg.isNullOrBlank()) found.add(cameraPkg)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not resolve default camera app: ${e.message}")
+        }
+
+        return found
     }
 }

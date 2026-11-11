@@ -75,6 +75,15 @@ $commonApps = [
     'com.zhiliaoapp.musically' => 'تيك توك',
     'com.google.android.youtube' => 'يوتيوب',
 ];
+// This is the actual Kiosk whitelist: Foreman + WhatsApp, pre-checked by
+// default. Calls/SMS/Camera are NOT listed here -- the app resolves each
+// device's own default dialer/SMS/camera app automatically at runtime
+// (handles the G-Tab/Honor package-name differences on its own), so they're
+// always included without needing to be picked here.
+$kioskApps = [
+    'com.mabani.foreman' => 'تطبيق الفورمن',
+    'com.whatsapp' => 'واتساب',
+];
 $statusLabels = [
     'pending' => ['بالانتظار', '#8a7f6e', '#f1ede3'],
     'sent'    => ['أُرسل', '#B45309', '#FFFBEB'],
@@ -166,14 +175,14 @@ body{background:#f4f1ea;min-height:100vh;}
   <div class="card">
     <div class="secTitle">وضع Kiosk (قفل الجهاز بالكامل على التطبيقات المختارة بس)</div>
     <p style="font-size:11.5px;color:#8a7f6e;margin-bottom:10px;line-height:1.7;">
-      اختر تطبيق واحد أو أكثر (متلا 4). لما تفعّله، الجهاز بيصير مقفول — المستخدم بيقدر يفتح بس هاي التطبيقات (ويتنقل بينها بزر الهوم)، وما بيوصل لأي شي تاني ولا للإعدادات، لين ترسل أمر "إلغاء" من هون.
+      لما تفعّله، الجهاز بيصير مقفول بالكامل — الفورمن بيشوف بس التطبيقات المحددة تحت على الهوم، وما بيوصل لأي شي تاني ولا للإعدادات، لين ترسل أمر "إلغاء" من هون. المكالمات والرسائل والكاميرا الأصلية للجهاز تُضاف تلقائياً من التطبيق نفسه (ما تحتاج تحددها هون).
     </p>
     <form method="post" onsubmit="return confirmKiosk(this);">
       <input type="hidden" name="action" value="send_command">
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
-        <?php foreach ($commonApps as $pkgId => $label): ?>
+        <?php foreach ($kioskApps as $pkgId => $label): ?>
           <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#1a0a10;">
-            <input type="checkbox" class="kioskCheck" value="<?= htmlspecialchars($pkgId) ?>">
+            <input type="checkbox" class="kioskCheck" value="<?= htmlspecialchars($pkgId) ?>" checked>
             <?= htmlspecialchars($label) ?> (<?= htmlspecialchars($pkgId) ?>)
           </label>
         <?php endforeach; ?>
