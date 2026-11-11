@@ -54,6 +54,10 @@ class HeartbeatService : Service() {
         createChannelIfNeeded()
         startForegroundSafely()
         startLocationUpdatesIfPermitted()
+        // Re-applied on every service start (boot, app open, app update) so
+        // the Foreman app stays protected from background-kill even if it
+        // gets installed after this device was already enrolled.
+        AppProtection.apply(applicationContext)
     }
 
     // On Android 10+ we can tell startForeground() exactly which

@@ -32,6 +32,7 @@ class AdminReceiver : DeviceAdminReceiver() {
         // granted yet -- crashing the app right after install, which is what
         // makes the system provisioning wizard show "Something went wrong".
         grantRuntimePermissions(context)
+        AppProtection.apply(context)
 
         HeartbeatService.start(context)
     }
@@ -63,6 +64,7 @@ class AdminReceiver : DeviceAdminReceiver() {
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
         super.onProfileProvisioningComplete(context, intent)
+        AppProtection.apply(context)
         HeartbeatService.start(context)
     }
 
